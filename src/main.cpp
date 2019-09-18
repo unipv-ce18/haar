@@ -60,12 +60,17 @@ void exeggutor(vector<Mat> images,
 		if (change_size)
 			resize(haar_img, haar_img, s);
 		//SHOW_IMAGE(haar_img);
+		
+		std::ostringstream name;
 		if (type == "par")
 		{
-			std::ostringstream name;
 			name << "output_img/" << type << "_img" << i << ".png";
-			cv::imwrite(name.str(), haar_img);
 		}
+		else if (type == "seq")
+		{
+			name << "output_img_seq/" << type << "_img" << i << ".png";
+		}
+		cv::imwrite(name.str(), haar_img);
 /*
 		media = mean(m, n, (double *)(image_double.data), n_level);
 		threshold(m, n, (double *)(image_double.data), n_level, media);
@@ -82,24 +87,36 @@ void exeggutor(vector<Mat> images,
 
 void execution_parallel_mix_sequential(int n_level, int n_level_stop, double *time, double *total_time)
 {
-	vector<Mat> images = load_img("output_img");
+	vector<Mat> images;
 	int n_level_to_do = n_level - n_level_stop;
 
 	Mat image;
-	Size s;
 	int m, n;
 	bool change_size;
 	
 	if (n_level_to_do > 0)
 	{
-		#pragma omp parallel for private(m, n, s, image, change_size) shared(n_level_stop, n_level_to_do, time, total_time, images)
+		images = load_img("output_img");
 		for (unsigned i = 0; i < images.size(); i++)
 		{
-			printf("core: %d, image: %d\n", omp_get_thread_num(), i);
 			image = images[i];
 			m = image.rows;
 			n = image.cols;
-			s = Size(n, m);
+
+			tie(change_size, m, n) = change_dimension(m, n);
+			if (change_size)
+			{				
+				resize(image, image, Size(n, m));
+				images[i] = image;
+			}
+		}
+
+		#pragma omp parallel for private(m, n, image, change_size) shared(n_level_stop, n_level_to_do, time, total_time, images)
+		for (unsigned i = 0; i < images.size(); i++)
+		{
+			image = images[i];
+			m = image.rows;
+			n = image.cols;
 
 			tie(change_size, m, n) = change_dimension(m, n);
 			if (change_size)
@@ -116,17 +133,17 @@ void execution_parallel_mix_sequential(int n_level, int n_level_stop, double *ti
 	}
 }
 
-void stampa(vector<Mat> images, int n_level, string type, double *total_time)
+void stampa(vector<Mat> images, int n_level, string type, double *total_time, FILE *f)
 {
-	printf("%s\n", type.c_str());
+	fprintf(f, "%s\n", type.c_str());
 	for (unsigned i = 0; i < images.size(); i++)
 	{	
-		printf("%d\t|\t", i);
+		fprintf(f, "%d\t|\t", i);
 		for (int j = 0; j < n_level; j++)
 		{
-			printf("%lf\t|\t", total_time[j + i * n_level]);
+			fprintf(f, "%lf\t|\t", total_time[j + i * n_level]);
 		}
-		printf("\n");
+		fprintf(f, "\n");
 	}
 }
 
@@ -145,25 +162,28 @@ int main(int argc, char **argv)
 	double *total_time_par = (double *)malloc(images.size() * n_level * sizeof(double));
 	double *total_time_par_first = (double *)malloc(images.size() * n_level_stop * sizeof(double));
 	double *total_time_par_second = (double *)malloc(images.size() * stop * sizeof(double));
-	double tmp, total = 0.0;
+	double tmp, total_seq = 0.0, total_par = 0.0;
 	double p;
+	FILE *f;
+	f = fopen ("stats.txt", "a+");
+	fprintf(f, "num_core: %d\nn_level: %d\nn_level_stop: %d\n", omp_get_num_procs(), n_level, n_level_stop);
 	
 	// sequential execution
 	iterator = 0;
 	start = omp_get_wtime();
 	exeggutor(images, n_level, "seq", time, iterator, haar, visualizza_haar, haar_inverse, threshold, mean, total_time_seq);
-	stampa(images, n_level, "SEQUENTIAL WORK", total_time_seq);
 	end = omp_get_wtime();
+	stampa(images, n_level, "SEQUENTIAL WORK", total_time_seq, f);
 	seq = end - start;
-	printf("Sequential work took %lf seconds\n", seq);
+	fprintf(f, "Sequential work took %lf seconds\n", seq);
 	
 	// parallel execution
 	iterator = 0;
 	start = omp_get_wtime();
-	exeggutor(images, n_level_stop, "par", time, iterator, p_haar, p_visualizza_haar, p_haar_inverse, p_threshold, p_mean, total_time_par_first);	
-	printf("eheheh\n");
+	exeggutor(images, n_level_stop, "par", time, iterator, p_haar, p_visualizza_haar, p_haar_inverse, p_threshold, p_mean, total_time_par_first);
 	execution_parallel_mix_sequential(n_level, n_level_stop, time, total_time_par_second);
-	
+	end = omp_get_wtime();
+
 	for (unsigned i = 0; i < images.size(); i++)
 	{
 		for (int j = 0; j < n_level_stop; j++)
@@ -176,30 +196,34 @@ int main(int argc, char **argv)
 		}
 	}
 
-	stampa(images, n_level, "PARALLEL WORK", total_time_par);
-	end = omp_get_wtime();
+	stampa(images, n_level, "PARALLEL WORK", total_time_par, f);
 	prl = end - start;
-	printf("Parallel work took %lf seconds\n", prl);
+	fprintf(f, "Parallel work took %lf seconds\n", prl);
 
 	speed_up = (1.0 - (prl / seq)) * 100;
-	printf("Time reduction: %.2lf%%\n", speed_up);
-/*
-	printf("TIME REDUCTION PER LEVEL\n");
+	fprintf(f, "Time reduction: %.2lf%%\n", speed_up);
+
+	fprintf(f, "TIME REDUCTION PER LEVEL\n");
 	for (unsigned i = 0; i < images.size(); i++)
 	{
-		printf("%dx%d\t|\t", images[i].cols, images[i].rows);
+		fprintf(f, "%dx%d\t|\t", images[i].cols, images[i].rows);
 		for (int j = 0; j < n_level; j++)
 		{
 			tmp = total_time_seq[j + i * n_level] / total_time_par[j + i * n_level];
-			(tmp < 1.5) ? printf("\033[1;31m%lf\t\033[0m|\t", tmp) : printf("%lf\t|\t", tmp);
-			total += total_time_seq[j + i * n_level];
+			(tmp < 1.5) ? fprintf(f, "[%lf]\t|\t", tmp) : fprintf(f, "%lf\t|\t", tmp);
+			total_seq += total_time_seq[j + i * n_level];
+			total_par += total_time_par[j + i * n_level];
 		}
-		printf("\n");
+		fprintf(f, "\n");
 	}
-*/
-	p = total / seq;
-	printf("speed up: %lf\n", 1 / (1 - p));
 
+	p = total_seq / seq;
+	fprintf(f, "speed up teorico: %lf\n", 1 / (1 - p + (p / omp_get_num_procs())));
+	fprintf(f, "speed up reale: %lf\n", (seq / prl));
+	fprintf(f, "speed up media: %lf\n", (total_seq / total_par));
+	fprintf(f, "\n\n\n");	
+
+	fclose(f);
 	free(time);
 	free(total_time_seq);
 	free(total_time_par_first);
