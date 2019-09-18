@@ -165,7 +165,8 @@ int main(int argc, char **argv)
 	double tmp, total_seq = 0.0, total_par = 0.0;
 	double p;
 	FILE *f;
-	f = fopen ("stats.txt", "a+");
+
+	f = fopen("stats.txt", "a+");
 	fprintf(f, "num_core: %d\nn_level: %d\nn_level_stop: %d\n", omp_get_num_procs(), n_level, n_level_stop);
 	
 	// sequential execution
