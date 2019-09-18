@@ -29,7 +29,7 @@ void exeggutor(vector<Mat> images,
 
 	int m, n;
 	bool change_size;
-	double media;
+	//double media;
 
 	for (unsigned i = 0; i < images.size(); i++)
 	{
@@ -63,13 +63,9 @@ void exeggutor(vector<Mat> images,
 		
 		std::ostringstream name;
 		if (type == "par")
-		{
 			name << "output_img/" << type << "_img" << i << ".png";
-		}
 		else if (type == "seq")
-		{
 			name << "output_img_seq/" << type << "_img" << i << ".png";
-		}
 		cv::imwrite(name.str(), haar_img);
 /*
 		media = mean(m, n, (double *)(image_double.data), n_level);
@@ -118,9 +114,6 @@ void execution_parallel_mix_sequential(int n_level, int n_level_stop, double *ti
 			m = image.rows;
 			n = image.cols;
 
-			tie(change_size, m, n) = change_dimension(m, n);
-			if (change_size)
-				resize(image, image, Size(n, m));
 			m = (int)(m / pow(2, n_level_stop - 1));
 			n = (int)(n / pow(2, n_level_stop - 1));
 			haar(m, n, image, n_level_to_do, time, n_level_stop);
