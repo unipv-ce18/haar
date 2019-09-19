@@ -146,8 +146,8 @@ int main(int argc, char **argv)
 
 	double start, end, seq, prl;
 	double speed_up;
-	int n_level = 8;
-	int n_level_stop = 6;
+	int n_level = 5;
+	int n_level_stop = 5;
 	int stop = n_level - n_level_stop;
 	int iterator;
 	double *time = (double *)malloc(n_level * sizeof(double));
