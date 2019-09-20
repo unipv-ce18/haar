@@ -13,7 +13,8 @@ using namespace cv;
 using namespace std;
 
 void exeggutor(vector<Mat> images, 
-			   int n_level, 
+			   int n_level,
+			   int n_level_stop, 
 			   string type,
 			   double *time,
 			   int iterator,
@@ -54,7 +55,9 @@ void exeggutor(vector<Mat> images,
 		}
 
 		image_double.copyTo(haar_img);
-		if (type == "seq")
+		if (n_level == n_level_stop)
+			visualizza(m, n, (double *)(haar_img.data), n_level);
+		else if (n_level != n_level_stop && type == "seq")
 			visualizza(m, n, (double *)(haar_img.data), n_level);
 		haar_img.convertTo(haar_img, CV_8U);
 		if (change_size)
@@ -81,6 +84,7 @@ void exeggutor(vector<Mat> images,
 	}
 }
 
+// too much overhead, better not to use this function; set n_level and n_level_stop equal
 void execution_parallel_mix_sequential(int n_level, int n_level_stop, double *time, double *total_time)
 {
 	vector<Mat> images;
@@ -165,7 +169,7 @@ int main(int argc, char **argv)
 	// sequential execution
 	iterator = 0;
 	start = omp_get_wtime();
-	exeggutor(images, n_level, "seq", time, iterator, haar, visualizza_haar, haar_inverse, threshold, mean, total_time_seq);
+	exeggutor(images, n_level, n_level_stop, "seq", time, iterator, haar, visualizza_haar, haar_inverse, threshold, mean, total_time_seq);
 	end = omp_get_wtime();
 	stampa(images, n_level, "SEQUENTIAL WORK", total_time_seq, f);
 	seq = end - start;
@@ -174,7 +178,7 @@ int main(int argc, char **argv)
 	// parallel execution
 	iterator = 0;
 	start = omp_get_wtime();
-	exeggutor(images, n_level_stop, "par", time, iterator, p_haar, p_visualizza_haar, p_haar_inverse, p_threshold, p_mean, total_time_par_first);
+	exeggutor(images, n_level_stop, n_level, "par", time, iterator, p_haar, p_visualizza_haar, p_haar_inverse, p_threshold, p_mean, total_time_par_first);
 	execution_parallel_mix_sequential(n_level, n_level_stop, time, total_time_par_second);
 	end = omp_get_wtime();
 
