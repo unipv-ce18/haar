@@ -97,6 +97,8 @@ void execution_parallel_mix_sequential(int n_level, int n_level_stop, double *ti
 	if (n_level_to_do > 0)
 	{
 		images = load_img("output_img");
+
+		#pragma omp parallel for private(m, n, image, change_size) shared(n_level_stop, n_level_to_do, time, total_time, images)
 		for (unsigned i = 0; i < images.size(); i++)
 		{
 			image = images[i];
@@ -105,18 +107,7 @@ void execution_parallel_mix_sequential(int n_level, int n_level_stop, double *ti
 
 			tie(change_size, m, n) = change_dimension(m, n);
 			if (change_size)
-			{				
 				resize(image, image, Size(n, m));
-				images[i] = image;
-			}
-		}
-
-		#pragma omp parallel for private(m, n, image, change_size) shared(n_level_stop, n_level_to_do, time, total_time, images)
-		for (unsigned i = 0; i < images.size(); i++)
-		{
-			image = images[i];
-			m = image.rows;
-			n = image.cols;
 
 			m = (int)(m / pow(2, n_level_stop - 1));
 			n = (int)(n / pow(2, n_level_stop - 1));
